@@ -1,0 +1,35 @@
+signin.example.com {
+    # 設定根目錄
+    root * /var/www/html/public
+    encode gzip zstd
+
+    # 處理靜態檔案
+    @static {
+        file
+        path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
+    }
+    handle @static {
+        file_server {
+            precompress gzip zstd
+        }
+    }
+
+    # 處理 PHP 檔案和其他請求（Laravel 前端控制器）
+    handle {
+        rewrite * /index.php{path}?{query}
+        php_fastcgi php:9000 {
+            index index.php
+            split .php
+        }
+    }
+
+    # 日誌
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 100mb
+            roll_keep 5
+        }
+        format json
+    }
+}
+
