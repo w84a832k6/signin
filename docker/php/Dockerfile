@@ -35,9 +35,6 @@ COPY php-fpm.conf /usr/local/etc/php-fpm.d/www.conf
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html
 
-# 切換到 www-data 用戶
-USER www-data
-
 # 暴露端口
 EXPOSE 9000
 

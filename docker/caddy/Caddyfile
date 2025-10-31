@@ -9,9 +9,7 @@ signin.example.com {
         path *.css *.js *.jpg *.jpeg *.png *.gif *.ico *.svg *.woff *.woff2 *.ttf *.eot
     }
     handle @static {
-        file_server {
-            precompress gzip zstd
-        }
+        file_server
     }
 
     # 處理 PHP 檔案和其他請求（Laravel 前端控制器）
