@@ -1,6 +1,6 @@
 FROM php:8.4-fpm-alpine
 
-# 安裝系統依賴
+# 安裝系統依賴（包括編譯工具，稍後再清理）
 RUN apk add --no-cache \
     git \
     curl \
@@ -10,23 +10,17 @@ RUN apk add --no-cache \
     freetype-dev \
     oniguruma-dev \
     icu-dev \
-    postgresql-dev \
+    sqlite-dev \
     zip \
     unzip \
-    mysql-client
+    $PHPIZE_DEPS
 
 # 配置和安裝 PHP 擴充功能
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
-    && docker-php-ext-install -j$(nproc) \
-        pdo \
-        pdo_mysql \
-        mysqli \
-        gd \
-        zip \
-        exif \
-        intl \
-        opcache \
-        bcmath
+# 注意：pdo、pdo_sqlite、sqlite3、bcmath 和 exif 在 PHP 8.4 中已經內建，不需要單獨安裝
+RUN set -eux; \
+    docker-php-ext-configure gd --with-freetype --with-jpeg; \
+    docker-php-ext-install -j$(nproc) gd zip intl opcache; \
+    apk del --no-network $PHPIZE_DEPS
 
 # 安裝 Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer

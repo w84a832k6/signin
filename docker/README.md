@@ -1,6 +1,6 @@
 # Docker 配置說明
 
-本目錄包含 Laravel 簽到系統的 Docker Compose 配置，使用 PHP 8.4、MySQL 8.0 和 Caddy，針對 8GB RAM 環境進行優化。
+本目錄包含 Laravel 簽到系統的 Docker Compose 配置，使用 PHP 8.4、SQLite 和 Caddy，針對低記憶體環境（1GB RAM）進行優化。
 
 ## 檔案結構
 
@@ -10,11 +10,10 @@ docker/
 ├── env.docker.example      # 環境變數範例檔案
 ├── php/
 │   ├── Dockerfile          # PHP 8.4 映像檔定義
-│   └── php.ini             # PHP 配置檔案
+│   ├── php.ini             # PHP 配置檔案
+│   └── php-fpm.conf        # PHP-FPM 配置檔案
 ├── caddy/
 │   └── Caddyfile           # Caddy 反向代理配置
-├── mysql/
-│   └── my.cnf              # MySQL 配置檔案
 └── README.md               # 本說明文件
 ```
 
@@ -31,8 +30,8 @@ cp docker/.env.docker .env
 編輯 `.env` 檔案，設定以下重要變數：
 - `APP_KEY` - 執行 `php artisan key:generate` 生成
 - `APP_URL` - 您的實際域名（例如：`https://signin.example.com`）
-- `DB_PASSWORD` - 資料庫密碼（建議使用強密碼）
-- `MYSQL_ROOT_PASSWORD` - MySQL root 密碼
+- `DB_CONNECTION` - 設為 `sqlite`（已預設）
+- `DB_DATABASE` - SQLite 資料庫路徑（已預設為 `/var/www/html/database/database.sqlite`）
 
 ### 2. 更新 Caddyfile 域名
 
@@ -68,9 +67,21 @@ docker-compose exec php sh
 
 # 在容器內執行以下命令
 composer install --optimize-autoloader --no-dev
+
+# 創建 SQLite 資料庫檔案（如果不存在）
+touch database/database.sqlite
+chmod 664 database/database.sqlite
+
+# 產生應用程式金鑰
 php artisan key:generate
+
+# 執行資料庫遷移
 php artisan migrate --force
+
+# 建立儲存連結
 php artisan storage:link
+
+# 快取設定
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
@@ -79,8 +90,8 @@ php artisan view:cache
 ### 5. 設定檔案權限
 
 ```bash
-# 設定 storage 和 bootstrap/cache 目錄權限
-docker-compose exec php sh -c "chmod -R 775 storage bootstrap/cache && chown -R www-data:www-data storage bootstrap/cache"
+# 設定 storage、bootstrap/cache 和 database 目錄權限
+docker-compose exec php sh -c "chmod -R 775 storage bootstrap/cache database && chown -R www-data:www-data storage bootstrap/cache database"
 ```
 
 ## 服務說明
@@ -88,14 +99,13 @@ docker-compose exec php sh -c "chmod -R 775 storage bootstrap/cache && chown -R 
 ### PHP 8.4 (signin_php)
 - **端口**: 9000 (內部)
 - **記憶體限制**: 256MB
-- **擴充功能**: pdo_mysql, gd, zip, exif, intl, opcache
+- **擴充功能**: pdo_sqlite, sqlite3, gd, zip, exif, intl, opcache
 - **工作目錄**: `/var/www/html`
 
-### MySQL 8.0 (signin_mysql)
-- **端口**: 3306 (可選外部訪問)
-- **記憶體限制**: 2GB
-- **資料庫**: `signin` (可透過環境變數修改)
-- **資料持久化**: `mysql-data` volume
+### SQLite
+- **資料庫檔案**: `/var/www/html/database/database.sqlite`
+- **優勢**: 無需獨立服務，記憶體需求極低，適合小型應用
+- **資料持久化**: 資料庫檔案直接保存在專案目錄中
 
 ### Caddy (signin_caddy)
 - **端口**: 80 (HTTP), 443 (HTTPS)
@@ -157,12 +167,12 @@ docker-compose exec php php artisan cache:clear
 
 ## 資源使用
 
-針對 8GB RAM 環境的資源限制：
+針對低記憶體環境（1GB RAM）的資源限制：
 
 - **PHP**: 256MB (limit) / 128MB (reservation)
-- **MySQL**: 2GB (limit) / 1GB (reservation)
+- **SQLite**: 無需額外記憶體（內嵌在 PHP 進程中）
 - **Caddy**: 128MB (limit) / 64MB (reservation)
-- **總計**: 約 2.4GB，留有足夠餘裕給系統和其他服務
+- **總計**: 約 384MB，適合 1GB RAM 的環境
 
 ## HTTPS 自動配置
 
@@ -185,10 +195,11 @@ Caddy 會自動從 Let's Encrypt 獲取 SSL 憑證，需要：
 - 確認 80 和 443 端口已開放
 - 檢查 `Caddyfile` 中的域名設定
 
-### MySQL 連線失敗
-- 確認 `.env` 中的資料庫設定與 `docker-compose.yml` 一致
-- 確認 MySQL 容器已正常啟動：`docker-compose ps`
-- 檢查 MySQL 日誌：`docker-compose logs mysql`
+### SQLite 資料庫錯誤
+- 確認 `database/database.sqlite` 檔案存在且有寫入權限
+- 檢查資料庫檔案權限：`docker-compose exec php ls -la database/`
+- 確認 `.env` 中 `DB_CONNECTION=sqlite` 和 `DB_DATABASE` 路徑正確
+- 如果資料庫檔案不存在，執行：`touch database/database.sqlite && chmod 664 database/database.sqlite`
 
 ### PHP 錯誤
 - 檢查 PHP 日誌：`docker-compose exec php cat /var/log/php_errors.log`
@@ -207,8 +218,9 @@ Caddy 會自動從 Let's Encrypt 獲取 SSL 憑證，需要：
    - 定期更新映像檔
 
 2. **備份**：
-   - 定期備份 MySQL volume
+   - 定期備份 `database/database.sqlite` 檔案
    - 備份 `.env` 和應用程式程式碼
+   - 備份 `storage/app` 目錄（上傳的檔案）
 
 3. **監控**：
    - 監控容器資源使用情況
