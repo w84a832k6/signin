@@ -101,12 +101,18 @@ document.addEventListener('DOMContentLoaded', function() {
                     'danger'
                 );
             }
-            // 掃描已停止，等待用戶點擊「開始掃描」按鈕繼續
+            // 1秒後自動重新開始掃描
+            setTimeout(() => {
+                startScanning();
+            }, 1000);
         })
         .catch(error => {
             showResult(`✗ 簽到處理發生錯誤，請稍後再試<br>掃描到的字串：<strong>${idNumber}</strong>`, 'danger');
             console.error('Error:', error);
-            // 掃描已停止，等待用戶點擊「開始掃描」按鈕繼續
+            // 1秒後自動重新開始掃描
+            setTimeout(() => {
+                startScanning();
+            }, 1000);
         });
     }
 
