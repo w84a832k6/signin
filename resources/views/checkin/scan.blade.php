@@ -92,24 +92,21 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(data => {
             if (data.success) {
                 showResult(
-                    `✓ 簽到成功！<br>參與者：${data.participant_name}<br>簽到時間：${data.check_in_time}`,
+                    `✓ 簽到成功！<br>掃描到的字串：<strong>${idNumber}</strong><br>參與者：${data.participant_name}<br>簽到時間：${data.check_in_time}`,
                     'success'
                 );
-                // 停止掃描，讓用戶確認結果
-                if (html5QrcodeScanner) {
-                    stopScanning();
-                }
-                // 3秒後重新開始掃描
-                setTimeout(() => {
-                    startScanning();
-                }, 3000);
             } else {
-                showResult(`✗ ${data.message}${data.check_in_time ? '<br>簽到時間：' + data.check_in_time : ''}`, 'danger');
+                showResult(
+                    `✗ ${data.message}<br>掃描到的字串：<strong>${idNumber}</strong>${data.check_in_time ? '<br>簽到時間：' + data.check_in_time : ''}`,
+                    'danger'
+                );
             }
+            // 掃描已停止，等待用戶點擊「開始掃描」按鈕繼續
         })
         .catch(error => {
-            showResult('✗ 簽到處理發生錯誤，請稍後再試', 'danger');
+            showResult(`✗ 簽到處理發生錯誤，請稍後再試<br>掃描到的字串：<strong>${idNumber}</strong>`, 'danger');
             console.error('Error:', error);
+            // 掃描已停止，等待用戶點擊「開始掃描」按鈕繼續
         });
     }
 
@@ -127,8 +124,18 @@ document.addEventListener('DOMContentLoaded', function() {
                 qrbox: { width: 250, height: 250 }
             },
             (decodedText, decodedResult) => {
-                // 掃描成功
+                // 掃描成功，立即停止掃描
                 console.log('掃描結果:', decodedText);
+                
+                // 立即停止掃描，等待簽到處理回應
+                stopScanning();
+                
+                showResult(
+                    `📷 掃描成功！<br>掃描到的字串：<strong>${decodedText}</strong><br>正在處理簽到...`,
+                    'info'
+                );
+                
+                // 處理簽到
                 performCheckIn(decodedText);
             },
             (errorMessage) => {
